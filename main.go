@@ -19,10 +19,11 @@ func main() {
 	go HealthCheck(lb.Servers, 10*time.Second)
 
 	//simulating traffic
-	for i := 0; i < 10; i++ {
+	fmt.Println("Load Balancer is running. Simulating traffic...")
+	for i := 0; i < 20; i++ {
 		server := lb.GetNextServer()
 		if server != nil {
-			fmt.Printf("Forwarding request to %s\n", server.Address)
+			fmt.Printf("Forwarding request %d to %s\n", i+1, server.Address)
 		} else {
 			fmt.Printf("No healthy servers available!")
 		}
