@@ -32,7 +32,7 @@ go mod tidy
 - Run the Load Balancer: Execute the following command to start the load balancer:
 
 ```bash
-  go run main.go
+  go run *.go -> to run all the .go extension files at once
 ```
 - Access Logs and Monitoring: Check logs in the logs/ folder for detailed information on traffic distribution and health checks.
 
