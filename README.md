@@ -44,8 +44,8 @@ Modify the config.yaml file to specify server details and health check intervals
 servers:
   - address: http://server1.com
   - address: http://server2.com
-healthCheckInterval: 5s
-loadBalancingAlgorithm: round-robin
+healthCheckInterval: 10s
+loadBalancingAlgorithm: round-robin and least connections
 ```
 
 ## Load Balancing Algorithms
