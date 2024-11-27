@@ -40,3 +40,24 @@ func (lb *Balancer) GetNextServer() *Server {
 	}
 	return nil
 }
+
+func (lb *Balancer) GetNextServerLL() *Server {
+	lb.Mutex.Lock()
+	defer lb.Mutex.Unlock()
+
+	var selectedServer *Server
+	minConnections := int(^uint(0) >> 1)
+
+	for _, server := range lb.Servers {
+		server.Mutex.Lock()
+		isHealthy := server.IsHealthy
+		activeconnections := server.ConCount
+		server.Mutex.Unlock()
+
+		if isHealthy && activeconnections < minConnections {
+			selectedServer = server
+			minConnections = activeconnections
+		}
+	}
+	return selectedServer
+}
