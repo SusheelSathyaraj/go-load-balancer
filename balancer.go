@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -21,6 +22,19 @@ func NewLoadBalancer(server []*Server, algo string) *Balancer {
 }
 
 func (lb *Balancer) GetNextServer() *Server {
+	switch lb.Algo {
+	case "round-robin":
+		return lb.GetNextServerRoundRobin()
+	case "least-connections":
+		return lb.GetNextServerLL()
+	default:
+		fmt.Println("unknown algorithm")
+	}
+
+	return nil
+}
+
+func (lb *Balancer) GetNextServerRoundRobin() *Server {
 	lb.Mutex.Lock()
 	defer lb.Mutex.Unlock()
 
