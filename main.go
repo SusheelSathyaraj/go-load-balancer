@@ -13,7 +13,8 @@ func main() {
 		{Address: "http://localhost:8082", IsHealthy: true},
 	}
 
-	lb := NewLoadBalancer(servers, "round-robin")
+	algo := "least-connection" //change to round robin or other algos as required
+	lb := NewLoadBalancer(servers, algo)
 
 	//	Start Health Checks
 	go HealthCheck(lb.Servers, 10*time.Second)
@@ -24,6 +25,14 @@ func main() {
 		server := lb.GetNextServer()
 		if server != nil {
 			fmt.Printf("Forwarding request %d to %s\n", i+1, server.Address)
+
+			//simulating starting a server
+			go func(s *Server) {
+				time.Sleep(500 * time.Millisecond) // request time
+				s.Mutex.Lock()
+				s.ConCount++
+				s.Mutex.Unlock()
+			}(server)
 		} else {
 			fmt.Printf("No healthy servers available!")
 		}
