@@ -13,7 +13,7 @@ func main() {
 		{Address: "http://localhost:8082", IsHealthy: true},
 	}
 
-	algo := "least-connection" //change to round robin or other algos as required
+	algo := "least-connections" //change to round robin or other algos as required
 	lb := NewLoadBalancer(servers, algo)
 
 	//	Start Health Checks
