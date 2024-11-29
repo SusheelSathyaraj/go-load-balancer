@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 )
 
@@ -18,6 +19,30 @@ func main() {
 
 	//	Start Health Checks
 	go HealthCheck(lb.Servers, 10*time.Second)
+
+	//HTTP for loadbalancer
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		server := lb.GetNextServer()
+		if server == nil {
+			http.Error(w, "no healthy servers present", http.StatusServiceUnavailable)
+			return
+		}
+		//backend server
+		resp, err := http.Get(server.Address + r.URL.Path)
+		if err != nil {
+			http.Error(w, "failed to forward the request", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		//copy the response from the backend to client
+		w.WriteHeader(resp.StatusCode)
+		resp.Write(w)
+
+		//starting the loadbalancer on port 8080
+		fmt.Println("Loadbalancer is running on port 8080")
+		http.ListenAndServe(":8080", nil)
+	})
 
 	//simulating traffic
 	fmt.Println("Load Balancer is running. Simulating traffic...")
