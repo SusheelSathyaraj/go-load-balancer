@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -39,10 +40,15 @@ func main() {
 		w.WriteHeader(resp.StatusCode)
 		resp.Write(w)
 
-		//starting the loadbalancer on port 8080
-		fmt.Println("Loadbalancer is running on port 8080")
-		http.ListenAndServe(":8080", nil)
 	})
+
+	//starting the loadbalancer on port 8080
+	go func() {
+		fmt.Println("Loadbalancer is running on port 8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Fatalf("failed to start the server %v", err)
+		}
+	}()
 
 	//simulating traffic
 	fmt.Println("Load Balancer is running. Simulating traffic...")
