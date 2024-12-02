@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	fmt.Println("load balancer")
+	fmt.Println("load balancer starting")
 
 	servers := []*Server{
 		{Address: "http://localhost:8081", IsHealthy: true},
@@ -50,18 +50,31 @@ func main() {
 		}
 	}()
 
-	//simulating traffic
+	//simulating traffic in a separate goroutine
+	go simulateTraffic(lb)
+
+	//block the main goroutine
+	select {}
+}
+
+// simulating traffic
+func simulateTraffic(lb *Balancer) {
 	fmt.Println("Load Balancer is running. Simulating traffic...")
 	for i := 0; i < 20; i++ {
 		server := lb.GetNextServer()
 		if server != nil {
 			fmt.Printf("Forwarding request %d to %s\n", i+1, server.Address)
 
-			//simulating starting a server
+			//simulate request starting
+			server.Mutex.Lock()
+			server.ConCount++
+			server.Mutex.Unlock()
+
+			//simulating request completion
 			go func(s *Server) {
 				time.Sleep(500 * time.Millisecond) // request time
 				s.Mutex.Lock()
-				s.ConCount++
+				s.ConCount--
 				s.Mutex.Unlock()
 			}(server)
 		} else {
