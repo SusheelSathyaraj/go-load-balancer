@@ -4,11 +4,43 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
+
+type ServerConfig struct {
+	Address string `yaml:"address"`
+}
+
+type Config struct {
+	Servers              []ServerConfig `yaml:"servers"`
+	HealthCheckIntervals int            `yaml:"health_check_interval"`
+	LoadBalancingAlgo    string         `yaml:"load_balancing_algorithm"`
+}
+
+// function for loading the config.yaml file
+func loadConfig(file string) (*Config, error) {
+
+	configFile, err := os.Open(file)
+	if err != nil {
+		return nil, fmt.Errorf("error reading config file: %v", err)
+	}
+	defer configFile.Close()
+
+	var config Config
+	if err := yaml.NewDecoder(configFile).Decode(&config); err != nil {
+		return nil, fmt.Errorf("error decoding yaml file: %v", err)
+	}
+	return &config, nil
+}
 
 func main() {
 	fmt.Println("load balancer starting")
+
+	//loading the config file
+	config, err := loadConfig("config.yaml")
 
 	servers := []*Server{
 		{Address: "http://localhost:8081", IsHealthy: true},
