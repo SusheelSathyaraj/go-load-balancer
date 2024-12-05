@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -79,13 +81,29 @@ func main() {
 
 	})
 
+	//context for graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer stop()
+
+	//start http server
+	server := &http.Server{Addr: ":8080", Handler: nil}
+
 	//starting the loadbalancer on port 8080
 	go func() {
 		log.Println("Loadbalancer is running on port 8080")
-		if err := http.ListenAndServe(":8080", nil); err != nil {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("failed to start the server %v", err)
 		}
 	}()
+	//waiting for signal
+	<-ctx.Done()
+
+	//Graceful shutdown
+	log.Println("Shutting down gracefully")
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Failed to shutdown gracefully: %v", err)
+	}
+	log.Println("Loadbalancer stopped")
 
 	//simulating traffic in a separate goroutine
 	go simulateTraffic(lb)
