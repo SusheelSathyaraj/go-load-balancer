@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -120,18 +121,25 @@ func simulateTraffic(lb *Balancer) {
 		if server != nil {
 			log.Printf("Forwarding request %d to %s\n", i+1, server.Address)
 
-			//simulate request starting
-			server.Mutex.Lock()
-			server.ConCount++
-			server.Mutex.Unlock()
+			//simulate variable load
+			go func(s *Server){
+				requestTime := time.Duration(100+rand.Intn(400))*time.Millisecond
+				time.Sleep(requestTime)
+				//simulate request starting
+				s.Mutex.Lock()
+				s.ConCount++
+				s.Mutex.Unlock()
 
-			//simulating request completion
-			go func(s *Server) {
-				time.Sleep(500 * time.Millisecond) // request time
+				//simulate request completion
+				time.Sleep(500*time.Millisecond)
 				s.Mutex.Lock()
 				s.ConCount--
 				s.Mutex.Unlock()
 			}(server)
+			time.Sleep(500*time.Millisecond)
+		}
+	}
+			
 		} else {
 			log.Printf("No healthy servers available!")
 		}
