@@ -25,19 +25,21 @@ func loadConfig(file string) (*Config, error) {
 
 	configFile, err := os.Open(file)
 	if err != nil {
+		log.Printf("Error: error reading the config file: %v", err)
 		return nil, fmt.Errorf("error reading config file: %v", err)
 	}
 	defer configFile.Close()
 
 	var config Config
 	if err := yaml.NewDecoder(configFile).Decode(&config); err != nil {
+		log.Printf("Error: decoding yaml file: %v", err)
 		return nil, fmt.Errorf("error decoding yaml file: %v", err)
 	}
 	return &config, nil
 }
 
 func main() {
-	fmt.Println("load balancer starting")
+	log.Println("load balancer starting")
 
 	//loading the config file
 	config, err := loadConfig("config.yaml")
@@ -79,7 +81,7 @@ func main() {
 
 	//starting the loadbalancer on port 8080
 	go func() {
-		fmt.Println("Loadbalancer is running on port 8080")
+		log.Println("Loadbalancer is running on port 8080")
 		if err := http.ListenAndServe(":8080", nil); err != nil {
 			log.Fatalf("failed to start the server %v", err)
 		}
@@ -94,11 +96,11 @@ func main() {
 
 // simulating traffic
 func simulateTraffic(lb *Balancer) {
-	fmt.Println("Load Balancer is running. Simulating traffic...")
+	log.Println("Load Balancer is running. Simulating traffic...")
 	for i := 0; i < 20; i++ {
 		server := lb.GetNextServer()
 		if server != nil {
-			fmt.Printf("Forwarding request %d to %s\n", i+1, server.Address)
+			log.Printf("Forwarding request %d to %s\n", i+1, server.Address)
 
 			//simulate request starting
 			server.Mutex.Lock()
@@ -113,7 +115,7 @@ func simulateTraffic(lb *Balancer) {
 				s.Mutex.Unlock()
 			}(server)
 		} else {
-			fmt.Printf("No healthy servers available!")
+			log.Printf("No healthy servers available!")
 		}
 		time.Sleep(1 * time.Second)
 	}
