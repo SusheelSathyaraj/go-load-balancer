@@ -41,17 +41,20 @@ func main() {
 
 	//loading the config file
 	config, err := loadConfig("config.yaml")
-
-	servers := []*Server{
-		{Address: "http://localhost:8081", IsHealthy: true},
-		{Address: "http://localhost:8082", IsHealthy: true},
+	if err != nil {
+		log.Fatalf("failed to load the config file: %v", err)
 	}
 
-	algo := "least-connections" //change to round robin or other algos as required
-	lb := NewLoadBalancer(servers, algo)
+	servers := make([]*Server, len(config.Servers))
+	for i, srv := range config.Servers {
+		servers[i] = &Server{Address: srv.Address, IsHealthy: true}
+	}
+
+	//loads the loadsbalancer
+	lb := NewLoadBalancer(servers, config.LoadBalancingAlgo)
 
 	//	Start Health Checks
-	go HealthCheck(lb.Servers, 10*time.Second)
+	go HealthCheck(lb.Servers, time.Duration(config.HealthCheckIntervals)*time.Second)
 
 	//HTTP for loadbalancer
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
