@@ -101,7 +101,7 @@ func main() {
 	lb := NewLoadBalancer(servers, config.LoadBalancingAlgo)
 
 	//Perform validation of the servers
-	go validateServers(lb.Servers)
+	validateServers(lb.Servers)
 
 	//	Start Health Checks
 	go HealthCheck(lb.Servers, time.Duration(config.HealthCheckIntervals)*time.Second)
@@ -141,6 +141,13 @@ func main() {
 			log.Fatalf("failed to start the server %v", err)
 		}
 	}()
+
+	//waiting briefly to ensure the server is running successfully before simulating traffic
+	time.Sleep(5 * time.Second)
+
+	//simulating traffic in a separate goroutine
+	go simulateTraffic(lb)
+
 	//waiting for signal
 	<-ctx.Done()
 
@@ -150,10 +157,4 @@ func main() {
 		log.Fatalf("Failed to shutdown gracefully: %v", err)
 	}
 	log.Println("Loadbalancer stopped")
-
-	//simulating traffic in a separate goroutine
-	go simulateTraffic(lb)
-
-	//block the main goroutine
-	select {}
 }
