@@ -41,6 +41,48 @@ func loadConfig(file string) (*Config, error) {
 	return &config, nil
 }
 
+// simulating traffic
+func simulateTraffic(lb *Balancer) {
+	log.Println("Load Balancer is running. Simulating traffic...")
+	for i := 0; i < 20; i++ {
+		server := lb.GetNextServer()
+		if server != nil {
+			log.Printf("Forwarding request %d to %s\n", i+1, server.Address)
+
+			//simulate variable load
+			go func(s *Server) {
+				requestTime := time.Duration(100+rand.Intn(400)) * time.Millisecond
+				time.Sleep(requestTime)
+				//simulate request starting
+				s.Mutex.Lock()
+				s.ConCount++
+				s.Mutex.Unlock()
+
+				//simulate request completion
+				time.Sleep(500 * time.Millisecond)
+				s.Mutex.Lock()
+				s.ConCount--
+				s.Mutex.Unlock()
+			}(server)
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+}
+
+// Initial Server validation for health
+func validateServers(servers []*Server) {
+	for _, server := range servers {
+		resp, err := http.Get(server.Address + "/health")
+		if err != nil || resp.StatusCode != http.StatusOK {
+			server.IsHealthy = false
+			log.Printf("Server %s is initially unhealthy", server.Address)
+		} else {
+			server.IsHealthy = true
+			log.Printf("Server %s is initially healthy", server.Address)
+		}
+	}
+}
+
 func main() {
 	log.Println("load balancer starting")
 
@@ -57,6 +99,9 @@ func main() {
 
 	//loads the loadsbalancer
 	lb := NewLoadBalancer(servers, config.LoadBalancingAlgo)
+
+	//Perform validation of the servers
+	go validateServers(lb.Servers)
 
 	//	Start Health Checks
 	go HealthCheck(lb.Servers, time.Duration(config.HealthCheckIntervals)*time.Second)
@@ -111,38 +156,4 @@ func main() {
 
 	//block the main goroutine
 	select {}
-}
-
-// simulating traffic
-func simulateTraffic(lb *Balancer) {
-	log.Println("Load Balancer is running. Simulating traffic...")
-	for i := 0; i < 20; i++ {
-		server := lb.GetNextServer()
-		if server != nil {
-			log.Printf("Forwarding request %d to %s\n", i+1, server.Address)
-
-			//simulate variable load
-			go func(s *Server){
-				requestTime := time.Duration(100+rand.Intn(400))*time.Millisecond
-				time.Sleep(requestTime)
-				//simulate request starting
-				s.Mutex.Lock()
-				s.ConCount++
-				s.Mutex.Unlock()
-
-				//simulate request completion
-				time.Sleep(500*time.Millisecond)
-				s.Mutex.Lock()
-				s.ConCount--
-				s.Mutex.Unlock()
-			}(server)
-			time.Sleep(500*time.Millisecond)
-		}
-	}
-			
-		} else {
-			log.Printf("No healthy servers available!")
-		}
-		time.Sleep(1 * time.Second)
-	}
 }
