@@ -24,7 +24,12 @@ func (s *Server) activeConnectionsHandler() http.HandlerFunc {
 		s.Mutex.Lock()
 		defer s.Mutex.Unlock()
 
-		log.Printf("The number of active connections on port %s are %d", s.Address, s.ConCount)
-		fmt.Fprintf(w, "The number of active connections on port %s are %d", s.Address, s.ConCount)
+		healthStatus := "unhealthy"
+		if s.IsHealthy {
+			healthStatus = "healthy"
+		}
+
+		log.Printf("The number of active connections on port %s are %d and the server is %s", s.Address, s.ConCount, healthStatus)
+		fmt.Fprintf(w, "The number of active connections on port %s are %d and the server is %s", s.Address, s.ConCount, healthStatus)
 	}
 }
