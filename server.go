@@ -17,7 +17,7 @@ type Server struct {
 
 // Active connections count
 
-func (s *Server) activeConnectionsHandler() http.HandlerFunc {
+func (s *Server) ActiveConnectionsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 
