@@ -83,6 +83,41 @@ func validateServers(servers []*Server) {
 	}
 }
 
+// simulate traffic to a single server for testing
+func simulateTrafficToSingleServer(lb *Balancer, targetAddr string) {
+	log.Printf("Simulating traffic for server %s", targetAddr)
+	for i := 0; i <= 20; i++ {
+		var targetServer *Server
+
+		//Find TargetServer in the loadbalancer
+		for _, server := range lb.Servers {
+			if server.Address == targetAddr {
+				targetServer = server
+				break
+			}
+		}
+		if targetServer == nil {
+			log.Printf("Target Server %s not present in the loadbalancer", targetAddr)
+			return
+		}
+		log.Printf("Forwarding the request %d to server %s", i+1, targetAddr)
+
+		//simulate starting the request
+		targetServer.Mutex.Lock()
+		targetServer.ConCount++
+		targetServer.Mutex.Unlock()
+
+		//simulate request completion
+		go func(s *Server) {
+			time.Sleep(500 * time.Millisecond)
+			s.Mutex.Lock()
+			s.ConCount--
+			s.Mutex.Unlock()
+		}(targetServer)
+		time.Sleep(1 * time.Second)
+	}
+}
+
 func main() {
 	log.Println("load balancer starting")
 
@@ -146,7 +181,13 @@ func main() {
 	time.Sleep(5 * time.Second)
 
 	//simulating traffic in a separate goroutine
-	go simulateTraffic(lb)
+	//go simulateTraffic(lb)
+
+	//simulate traffic to a single server
+	//used here only for testing
+	//when used, comment simulateTraffic(lb)
+
+	go simulateTrafficToSingleServer(lb, "http://localhost:8081")
 
 	//waiting for signal
 	<-ctx.Done()
