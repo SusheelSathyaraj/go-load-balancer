@@ -1,14 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"sync"
 )
 
 type Balancer struct {
 	Servers []*Server
 	Current int
-	Mutex   sync.Mutex
+	Mutex   sync.RWMutex
 	Algo    string //selection between round robin and least connection
 }
 
@@ -28,45 +28,50 @@ func (lb *Balancer) GetNextServer() *Server {
 	case "least-connections":
 		return lb.GetNextServerLL()
 	default:
-		fmt.Println("unknown algorithm")
+		log.Printf("Unknown algorithm: %s, using round robin", lb.Algo)
+		return lb.GetNextServerRoundRobin()
 	}
-
-	return nil
 }
 
 func (lb *Balancer) GetNextServerRoundRobin() *Server {
 	lb.Mutex.Lock()
 	defer lb.Mutex.Unlock()
 
-	for i := 0; i < len(lb.Servers); i++ {
+	if len(lb.Servers) == 0 {
+		return nil
+	}
+
+	attempts := 0
+	for attempts < len(lb.Servers) {
 		idx := lb.Current % len(lb.Servers)
 		lb.Current++
 
 		server := lb.Servers[idx]
 
-		server.Mutex.Lock()
+		server.Mutex.RLock()
 		isHealthy := server.IsHealthy
-		server.Mutex.Unlock()
+		server.Mutex.RUnlock()
 
 		if isHealthy {
 			return server
 		}
+		attempts++
 	}
 	return nil
 }
 
 func (lb *Balancer) GetNextServerLL() *Server {
-	lb.Mutex.Lock()
-	defer lb.Mutex.Unlock()
+	lb.Mutex.RLock()
+	defer lb.Mutex.RUnlock()
 
 	var selectedServer *Server
-	minConnections := int(^uint(0) >> 1)
+	minConnections := int(^uint(0) >> 1) //max int
 
 	for _, server := range lb.Servers {
-		server.Mutex.Lock()
+		server.Mutex.RLock()
 		isHealthy := server.IsHealthy
 		activeconnections := server.ConCount
-		server.Mutex.Unlock()
+		server.Mutex.RUnlock()
 
 		if isHealthy && activeconnections < minConnections {
 			selectedServer = server
