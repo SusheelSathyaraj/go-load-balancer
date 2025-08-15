@@ -115,7 +115,6 @@ func (lb *Balancer) GetServerCount() int {
 }
 
 // number of healthy servers
-
 func (lb *Balancer) GetHealthyServerCount() int {
 	lb.Mutex.RLock()
 	defer lb.Mutex.RUnlock()
@@ -129,4 +128,25 @@ func (lb *Balancer) GetHealthyServerCount() int {
 		server.Mutex.RUnlock()
 	}
 	return count
+}
+
+// returning the current loadbalancing algorithm
+func (lb *Balancer) GetAlgorithm() string {
+	lb.Mutex.RLock()
+	defer lb.Mutex.RUnlock()
+
+	return lb.Algo
+}
+
+// Changes the load balancing algorithm
+func (lb *Balancer) SetAlgorithm(algo string) {
+	lb.Mutex.RLock()
+	defer lb.Mutex.RUnlock()
+
+	if algo == "round-robin" || algo == "least-connection" {
+		lb.Algo = algo
+		log.Printf("Changed algorithm to %s", algo)
+	} else {
+		log.Printf("Invalid algorithm: %s, using the current algorithm %s", algo, lb.Algo)
+	}
 }
