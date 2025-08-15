@@ -80,3 +80,28 @@ func (lb *Balancer) GetNextServerLL() *Server {
 	}
 	return selectedServer
 }
+
+// adding a new server to the pool for dynamic scaling
+func (lb *Balancer) AddServer(server *Server) {
+	lb.Mutex.RLock()
+	defer lb.Mutex.RUnlock()
+
+	lb.Servers = append(lb.Servers, server)
+	log.Printf("Added server %s", server.Address)
+}
+
+// removing a server from the server pool
+func (lb *Balancer) RemoveServer(address string) {
+	lb.Mutex.RLock()
+	defer lb.Mutex.RUnlock()
+
+	for i, server := range lb.Servers {
+		if server.Address == address {
+			//removing server from the pool
+			lb.Servers = append(lb.Servers[:i], lb.Servers[i+1:]...)
+			log.Printf("Removed Server %s from the pool", server.Address)
+			return
+		}
+	}
+	log.Printf("Server not found,%s", address)
+}
