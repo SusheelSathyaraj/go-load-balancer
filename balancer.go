@@ -105,3 +105,28 @@ func (lb *Balancer) RemoveServer(address string) {
 	}
 	log.Printf("Server not found,%s", address)
 }
+
+// total number of servers
+func (lb *Balancer) GetServerCount() int {
+	lb.Mutex.RLock()
+	defer lb.Mutex.RUnlock()
+
+	return len(lb.Servers)
+}
+
+// number of healthy servers
+
+func (lb *Balancer) GetHealthyServerCount() int {
+	lb.Mutex.RLock()
+	defer lb.Mutex.RUnlock()
+
+	count := 0
+	for _, server := range lb.Servers {
+		server.Mutex.RLock()
+		if server.IsHealthy {
+			count++
+		}
+		server.Mutex.RUnlock()
+	}
+	return count
+}
