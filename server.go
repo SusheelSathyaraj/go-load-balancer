@@ -106,3 +106,38 @@ func (s *Server) ActiveConnectionsHandler() http.HandlerFunc {
 		fmt.Fprintf(w, response)
 	}
 }
+
+// returning the string representation of the server
+func (s *Server) String() string {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+
+	status := "unhealthy"
+	if s.IsHealthy {
+		status = "healthy"
+	}
+	return fmt.Sprintf("Server(Address: %s, Status: %s, Connections: %d", s.Address, status, s.ConCount)
+}
+
+// Resetting the server connection count and health status
+func (s *Server) Reset() {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	s.ConCount = 0
+	s.IsHealthy = false
+	log.Printf("Server %s has been reset", s.Address)
+}
+
+// Creating a copy of the server for testing
+func (s *Server) Clone() *Server {
+	s.Mutex.RLock()
+	defer s.Mutex.RUnlock()
+
+	return &Server{
+		Address:   s.Address,
+		IsHealthy: s.IsHealthy,
+		ConCount:  s.ConCount,
+		URL:       s.URL,
+	}
+}
