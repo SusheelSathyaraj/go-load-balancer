@@ -48,9 +48,9 @@ func (lb *Balancer) GetNextServerRoundRobin() *Server {
 
 		server := lb.Servers[idx]
 
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		isHealthy := server.IsHealthy
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 
 		if isHealthy {
 			return server
@@ -68,10 +68,10 @@ func (lb *Balancer) GetNextServerLL() *Server {
 	minConnections := int(^uint(0) >> 1) //max int
 
 	for _, server := range lb.Servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		isHealthy := server.IsHealthy
 		activeconnections := server.ConCount
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 
 		if isHealthy && activeconnections < minConnections {
 			selectedServer = server
@@ -121,11 +121,11 @@ func (lb *Balancer) GetHealthyServerCount() int {
 
 	count := 0
 	for _, server := range lb.Servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		if server.IsHealthy {
 			count++
 		}
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 	}
 	return count
 }
