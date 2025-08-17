@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 )
 
@@ -13,6 +14,23 @@ type Server struct {
 	IsHealthy bool
 	Mutex     sync.Mutex
 	ConCount  int //for least connection algo
+	URL       *url.URL
+}
+
+// creating a new server instance
+func NewServer(address string) (*Server, error) {
+	serverURL, err := url.Parse(address)
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid server URL %s: %v", address, err)
+	}
+
+	return &Server{
+		Address:   address,
+		IsHealthy: false, //will be set by the health chech methods
+		ConCount:  0,
+		URL:       serverURL,
+	}, nil
 }
 
 // Active connections count
