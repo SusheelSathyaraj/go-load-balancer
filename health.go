@@ -8,12 +8,15 @@ import (
 	"time"
 )
 
+// performing periodic health checks
 func HealthCheck(servers []*Server, interval time.Duration, ctx context.Context) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	log.Printf("Starting health checks with %v interval", interval)
 
 	//Initial Health Checks
 	checkAllServers(servers)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -26,8 +29,10 @@ func HealthCheck(servers []*Server, interval time.Duration, ctx context.Context)
 	}
 }
 
+// performing health check on all the servers concurrently
 func checkAllServers(servers []*Server) {
 	var wg sync.WaitGroup
+
 	for _, server := range servers {
 		wg.Add(1)
 		go func(s *Server) {
@@ -38,11 +43,13 @@ func checkAllServers(servers []*Server) {
 	wg.Wait()
 }
 
+// performing health check on a single server
 func checkserverHealth(server *Server) {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
 
+	//send http get request to the server's health endpoint
 	resp, err := client.Get(server.Address + "/health")
 
 	server.Mutex.RLock()
@@ -62,4 +69,90 @@ func checkserverHealth(server *Server) {
 		}
 		resp.Body.Close()
 	}
+}
+
+// performing a one-time health check on all servers
+func PerformSingleHealthCheck(servers []*Server) {
+	log.Println("Performing initial health check...")
+	checkAllServers(servers)
+
+	healthycount := 0
+
+	for _, server := range servers {
+		server.Mutex.RLock()
+		if server.IsHealthy {
+			healthycount++
+		}
+		server.Mutex.RUnlock()
+	}
+	log.Printf("Initial health check completed: %d of %d servers healthy", healthycount, len(servers))
+}
+
+// Returning the helath status of all the servers
+func GetHealthStatus(servers []*Server) map[string]bool {
+	status := make(map[string]bool)
+
+	for _, server := range servers {
+		server.Mutex.RLock()
+		status[server.Address] = server.IsHealthy
+		server.Mutex.RUnlock()
+	}
+	return status
+}
+
+// Checking if atleast one server is healthy
+func IsAnyServerHealthy(servers []*Server) bool {
+	for _, server := range servers {
+		server.Mutex.RLock()
+		isHealthy := server.IsHealthy
+		server.Mutex.RUnlock()
+
+		if isHealthy {
+			return true
+		}
+	}
+	return false
+}
+
+// getting a list of healthy servers
+func GetHealthyServers(servers []*Server) []*Server {
+	var healthy []*Server
+
+	for _, server := range servers {
+		server.Mutex.RLock()
+		if server.IsHealthy {
+			healthy = append(healthy, server)
+		}
+		server.Mutex.RUnlock()
+	}
+	return healthy
+}
+
+// getting the number of healthy and unhealthy servers in a single pass
+func GetServerCount(servers []*Server) (healhty, unhealthy int) {
+	healthy, unhealthy := 0, 0
+	for _, server := range servers {
+		server.Mutex.RLock()
+		if server.IsHealthy {
+			healthy++
+		} else {
+			unhealthy++
+		}
+		server.Mutex.RUnlock()
+	}
+	return healthy, unhealthy
+}
+
+// getting a list of unhealthy servers
+func GetUnhealthyServers(servers []*Server) []*Server {
+	var unhealthy []*Server
+
+	for _, server := range servers {
+		server.Mutex.RLock()
+		if !server.IsHealthy {
+			unhealthy = append(unhealthy, server)
+		}
+		server.Mutex.RUnlock()
+	}
+	return unhealthy
 }
