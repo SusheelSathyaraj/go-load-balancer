@@ -52,8 +52,8 @@ func checkserverHealth(server *Server) {
 	//send http get request to the server's health endpoint
 	resp, err := client.Get(server.Address + "/health")
 
-	server.Mutex.RLock()
-	defer server.Mutex.RUnlock()
+	server.Mutex.Lock()
+	defer server.Mutex.Unlock()
 
 	previousHealth := server.IsHealthy
 
@@ -79,11 +79,11 @@ func PerformSingleHealthCheck(servers []*Server) {
 	healthycount := 0
 
 	for _, server := range servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		if server.IsHealthy {
 			healthycount++
 		}
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 	}
 	log.Printf("Initial health check completed: %d of %d servers healthy", healthycount, len(servers))
 }
@@ -93,9 +93,9 @@ func GetHealthStatus(servers []*Server) map[string]bool {
 	status := make(map[string]bool)
 
 	for _, server := range servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		status[server.Address] = server.IsHealthy
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 	}
 	return status
 }
@@ -103,9 +103,9 @@ func GetHealthStatus(servers []*Server) map[string]bool {
 // Checking if atleast one server is healthy
 func IsAnyServerHealthy(servers []*Server) bool {
 	for _, server := range servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		isHealthy := server.IsHealthy
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 
 		if isHealthy {
 			return true
@@ -119,11 +119,11 @@ func GetHealthyServers(servers []*Server) []*Server {
 	var healthy []*Server
 
 	for _, server := range servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		if server.IsHealthy {
 			healthy = append(healthy, server)
 		}
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 	}
 	return healthy
 }
@@ -132,13 +132,13 @@ func GetHealthyServers(servers []*Server) []*Server {
 func GetServerCount(servers []*Server) (healhty, unhealthy int) {
 	healthy, unhealthy := 0, 0
 	for _, server := range servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		if server.IsHealthy {
 			healthy++
 		} else {
 			unhealthy++
 		}
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 	}
 	return healthy, unhealthy
 }
@@ -148,11 +148,11 @@ func GetUnhealthyServers(servers []*Server) []*Server {
 	var unhealthy []*Server
 
 	for _, server := range servers {
-		server.Mutex.RLock()
+		server.Mutex.Lock()
 		if !server.IsHealthy {
 			unhealthy = append(unhealthy, server)
 		}
-		server.Mutex.RUnlock()
+		server.Mutex.Unlock()
 	}
 	return unhealthy
 }
