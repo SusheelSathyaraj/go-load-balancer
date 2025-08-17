@@ -82,19 +82,27 @@ func (s *Server) GetServerInfo() map[string]interface{} {
 	}
 }
 
+// http handler for monitoring active connections
 func (s *Server) ActiveConnectionsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
-		s.Mutex.Lock()
-		defer s.Mutex.Unlock()
+		s.Mutex.RLock()
+		defer s.Mutex.RUnlock()
 
 		healthStatus := "unhealthy"
 		if s.IsHealthy {
 			healthStatus = "healthy"
 		}
 
-		log.Printf("The number of active connections on port %s are %d and the server is %s", s.Address, s.ConCount, healthStatus)
-		fmt.Fprintf(w, "The number of active connections on port %s are %d and the server is %s", s.Address, s.ConCount, healthStatus)
+		response := fmt.Sprintf(`{
+		"address":"%s",
+		"active-connections":"%d",
+		"status":"%s"
+		}`, s.Address, s.ConCount, healthStatus)
+
+		log.Printf("Status check for %s: %d connections, %s", s.Address, s.ConCount, healthStatus)
+		fmt.Fprintf(w, response)
 	}
 }
