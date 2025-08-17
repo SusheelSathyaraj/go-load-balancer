@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -38,7 +39,82 @@ func loadConfig(file string) (*Config, error) {
 		log.Printf("Error: decoding yaml file: %v", err)
 		return nil, fmt.Errorf("error decoding yaml file: %v", err)
 	}
+
+	//setting defaults
+	if config.HealthCheckIntervals == 0 {
+		config.HealthCheckIntervals = 10
+	}
+	if config.LoadBalancingAlgo == "" {
+		config.LoadBalancingAlgo = "round-robin"
+	}
+
 	return &config, nil
+}
+
+// HTTP handler for load balancing
+func (lb *Balancer) handleRequest(w http.ResponseWriter, r *http.Request) {
+	server := lb.GetNextServer()
+	if server == nil {
+		http.Error(w, "No healthy servers available", http.StatusServiceUnavailable)
+		return
+	}
+
+	//increment connection count
+	server.Mutex.Lock()
+	server.ConCount++
+	server.Mutex.Unlock()
+
+	//decrement connection count when completed
+	defer func() {
+		server.Mutex.Lock()
+		server.ConCount--
+		server.Mutex.Unlock()
+	}()
+
+	//creating a proxy request
+	proxyReq, err := http.NewRequest(r.Method, server.Address+r.URL.Path, r.Body)
+	if err != nil {
+		http.Error(w, "failed to create proxy request", http.StatusInternalServerError)
+		return
+	}
+
+	//copying headers
+	for header, values := range r.Header {
+		for _, value := range values {
+			proxyReq.Header.Add(header, value)
+		}
+	}
+
+	//making request
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		http.Error(w, "failed to forward request", http.StatusBadGateway)
+		log.Printf("Failed to forward request to %s: %v", server.Address, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	//copying respose headers
+	for header, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(header, value)
+		}
+	}
+
+	//copying status code
+	w.WriteHeader(resp.StatusCode)
+
+	//copying resposnse body
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		log.Printf("error copying the response body, %v", err)
+	}
+
+	log.Printf("Request forwarded to %s, status: %d", server.Address, resp.StatusCode)
 }
 
 // simulating traffic
