@@ -117,6 +117,22 @@ func (lb *Balancer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request forwarded to %s, status: %d", server.Address, resp.StatusCode)
 }
 
+// handler for status endpoint
+func (lb *Balancer) handleStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"status":"healthy","algorithm":"%s","servers":[`, lb.Algo)
+
+	for i, server := range lb.Servers {
+		server.Mutex.Lock()
+		if i > 0 {
+			fmt.Fprintf(w, ",")
+		}
+		fmt.Fprintf(w, `{"address":"%s","healthy":"%v","connections":"%d"}`, server.Address, server.IsHealthy, server.ConCount)
+		server.Mutex.Unlock()
+	}
+	fmt.Fprintf(w, `]}`)
+}
+
 // simulating traffic
 func simulateTraffic(lb *Balancer) {
 	log.Println("Load Balancer is running. Simulating traffic...")
