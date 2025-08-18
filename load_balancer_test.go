@@ -133,6 +133,25 @@ func TestServerConnectionManagement(t *testing.T) {
 	}
 }
 
+func TestServerHealthManagement(t *testing.T) {
+	server, _ := NewServer("http://localhost:8081")
+
+	//test initial state
+	if server.IsHealthy {
+		t.Errorf("Expected server initial state to be unhealthy")
+	}
+
+	//test setting healthy
+	if server.SetHealthy(true) {
+		t.Errorf("Expected server state to be set to true")
+	}
+
+	//test setting unhealthy
+	if server.SetHealthy(false) {
+		t.Errorf("Expected server state to be set to false")
+	}
+}
+
 // Test for Load Balance
 func TestNewLoadBalancer(t *testing.T) {
 	servers, testServers := createTestServers(3, true)
@@ -154,5 +173,58 @@ func TestNewLoadBalancer(t *testing.T) {
 
 	if lb.GetServerCount() != 3 {
 		t.Errorf("Expected server count of 3, got %d", lb.GetServerCount())
+	}
+}
+
+func TestRoundRobinBalancing(t *testing.T) {
+	servers, testservers := createTestServers(3, true)
+	defer cleanup(testservers)
+
+	lb := NewLoadBalancer(servers, "round-robin")
+
+	//testing basic round robin rotation
+	firstServer := lb.GetNextServer()
+	secondServer := lb.GetNextServer()
+	thirdServer := lb.GetNextServer()
+	fourthServer := lb.GetNextServer()
+
+	if firstServer == nil || secondServer == nil || thirdServer == nil || fourthServer == nil {
+		t.Errorf("Expected servers to be returned")
+	}
+
+	//cycle through servers
+	if firstServer.Address == secondServer.Address {
+		t.Errorf("Expected different servers in consecutive calls")
+	}
+
+	if secondServer.Address == thirdServer.Address {
+		t.Errorf("Expected different servers in consecutive calls")
+	}
+
+	if firstServer.Address != fourthServer.Address {
+		t.Errorf("Expected to cycle back to first server")
+	}
+}
+
+func TestLeastConnectionBalancing(t *testing.T) {
+	servers, testServers := createTestServers(3, true)
+	defer cleanup(testServers)
+
+	//set different connection counts
+	servers[0].ConCount = 5
+	servers[1].ConCount = 2
+	servers[2].ConCount = 8
+
+	lb := NewLoadBalancer(servers, "least-connections")
+
+	selectServer := lb.GetNextServer()
+
+	if selectServer == nil {
+		t.Fatal("Expected server to be returned")
+	}
+
+	//should select server with least connections
+	if selectServer.ConCount != 2 {
+		t.Errorf("Expected server with 2 connections, as it has the least connections, got server with %d connections", selectServer.ConCount)
 	}
 }
