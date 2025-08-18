@@ -7,8 +7,10 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -133,85 +135,44 @@ func (lb *Balancer) handleStatus(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `]}`)
 }
 
-// simulating traffic
-func simulateTraffic(lb *Balancer) {
+// simulating traffic for testing
+func simulateTraffic(ctx context.Context) {
 	log.Println("Load Balancer is running. Simulating traffic...")
-	for i := 0; i < 20; i++ {
-		server := lb.GetNextServer()
-		if server != nil {
-			log.Printf("Forwarding request %d to %s\n", i+1, server.Address)
 
-			//simulate variable load
-			go func(s *Server) {
-				requestTime := time.Duration(100+rand.Intn(400)) * time.Millisecond
-				time.Sleep(requestTime)
-				//simulate request starting
-				s.Mutex.Lock()
-				s.ConCount++
-				s.Mutex.Unlock()
-
-				//simulate request completion
-				time.Sleep(500 * time.Millisecond)
-				s.Mutex.Lock()
-				s.ConCount--
-				s.Mutex.Unlock()
-			}(server)
-			time.Sleep(500 * time.Millisecond)
-		}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
 	}
-}
 
-// Initial Server validation for health
-func validateServers(servers []*Server) {
-	for _, server := range servers {
-		resp, err := http.Get(server.Address + "/health")
-		if err != nil || resp.StatusCode != http.StatusOK {
-			server.IsHealthy = false
-			log.Printf("Server %s is initially unhealthy", server.Address)
-		} else {
-			server.IsHealthy = true
-			log.Printf("Server %s is initially healthy", server.Address)
-		}
-	}
-}
-
-// simulate traffic to a single server for testing
-func simulateTrafficToSingleServer(lb *Balancer, targetAddr string) {
-	log.Printf("Simulating traffic for server %s", targetAddr)
-	for i := 0; i <= 20; i++ {
-		var targetServer *Server
-
-		//Find TargetServer in the loadbalancer
-		for _, server := range lb.Servers {
-			if server.Address == targetAddr {
-				targetServer = server
-				break
-			}
-		}
-		if targetServer == nil {
-			log.Printf("Target Server %s not present in the loadbalancer", targetAddr)
+	for i := 0; i < 50; i++ {
+		select {
+		case <-ctx.Done():
+			log.Println("Stopping traffic simulation")
 			return
+		default:
+			go func(requestID int) {
+				resp, err := client.Get("http://localhost:8080/")
+				if err != nil {
+					log.Printf("Request %d failed %v", requestID, err)
+					return
+				}
+				defer resp.Body.Close()
+
+				body, _ := io.ReadAll(resp.Body)
+				bodyStr := string(body)
+				if len(bodyStr) > 50 {
+					bodyStr = bodyStr[:50] + "..."
+				}
+				log.Printf("Request %d completed: %s", requestID, bodyStr)
+			}(i + 1)
+
+			//Random delay between requests
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 		}
-		log.Printf("Forwarding the request %d to server %s", i+1, targetAddr)
-
-		//simulate starting the request
-		targetServer.Mutex.Lock()
-		targetServer.ConCount++
-		targetServer.Mutex.Unlock()
-
-		//simulate request completion
-		go func(s *Server) {
-			time.Sleep(500 * time.Millisecond)
-			s.Mutex.Lock()
-			s.ConCount--
-			s.Mutex.Unlock()
-		}(targetServer)
-		time.Sleep(1 * time.Second)
 	}
 }
 
 func main() {
-	log.Println("load balancer starting")
+	log.Println("Load balancer starting...")
 
 	//loading the config file
 	config, err := loadConfig("config.yaml")
@@ -219,51 +180,46 @@ func main() {
 		log.Fatalf("failed to load the config file: %v", err)
 	}
 
+	//initializing servers
 	servers := make([]*Server, len(config.Servers))
 	for i, srv := range config.Servers {
-		servers[i] = &Server{Address: srv.Address, IsHealthy: true}
+		serverURL, err := url.Parse(srv.Address)
+		if err != nil {
+			log.Fatalf("Invalid server URL %s: %v", srv.Address, err)
+		}
+		servers[i] = &Server{Address: srv.Address, IsHealthy: false, URL: serverURL}
 	}
 
-	//loads the loadsbalancer
+	//creates the loadsbalancer using loadbalancer.go
 	lb := NewLoadBalancer(servers, config.LoadBalancingAlgo)
 
-	//Perform validation of the servers
-	validateServers(lb.Servers)
-
-	//	Start Health Checks
-	go HealthCheck(lb.Servers, time.Duration(config.HealthCheckIntervals)*time.Second)
-
-	//HTTP for loadbalancer
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		server := lb.GetNextServer()
-		if server == nil {
-			http.Error(w, "no healthy servers present", http.StatusServiceUnavailable)
-			return
-		}
-		//backend server
-		resp, err := http.Get(server.Address + r.URL.Path)
-		if err != nil {
-			http.Error(w, "failed to forward the request", http.StatusInternalServerError)
-			return
-		}
-		defer resp.Body.Close()
-
-		//copy the response from the backend to client
-		w.WriteHeader(resp.StatusCode)
-		resp.Write(w)
-
-	})
+	log.Printf("Load Balancer configured with %d servers using %s algorithm", len(servers), config.LoadBalancingAlgo)
 
 	//context for graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer stop()
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
-	//start http server
-	server := &http.Server{Addr: ":8080", Handler: nil}
+	//	Start Health Checks
+	go HealthCheck(lb.Servers, time.Duration(config.HealthCheckIntervals)*time.Second, ctx)
+
+	//wait for initial healthchecks
+	time.Sleep(2 * time.Second)
+
+	//setting up HTTP server with method binding
+	http.HandleFunc("/", lb.handleRequest)
+	http.HandleFunc("/status", lb.handleStatus)
+
+	//starting HTTP server
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: nil,
+	}
 
 	//starting the loadbalancer on port 8080
 	go func() {
 		log.Println("Loadbalancer is running on port 8080")
+		log.Println("Endpoints: http://localhost:8080/ (load balanced), http://localhost:8080/status (status)")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("failed to start the server %v", err)
 		}
@@ -273,21 +229,19 @@ func main() {
 	time.Sleep(5 * time.Second)
 
 	//simulating traffic in a separate goroutine
-	//go simulateTraffic(lb)
-
-	//simulate traffic to a single server
-	//used here only for testing
-	//when used, comment simulateTraffic(lb)
-
-	go simulateTrafficToSingleServer(lb, "http://localhost:8081")
+	go simulateTraffic(ctx)
 
 	//waiting for signal
 	<-ctx.Done()
 
 	//Graceful shutdown
-	log.Println("Shutting down gracefully")
-	if err := server.Shutdown(ctx); err != nil {
+	log.Println("Shutting down loadbalancer")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("Failed to shutdown gracefully: %v", err)
 	}
-	log.Println("Loadbalancer stopped")
+	log.Println("Loadbalancer stopped successfully")
 }
