@@ -228,3 +228,103 @@ func TestLeastConnectionBalancing(t *testing.T) {
 		t.Errorf("Expected server with 2 connections, as it has the least connections, got server with %d connections", selectServer.ConCount)
 	}
 }
+
+func TestHealthyServerSelection(t *testing.T) {
+	servers, testServers := createTestServers(3, true)
+	defer cleanup(testServers)
+
+	//make only the second server healhty
+	servers[1].IsHealthy = true
+
+	lb := NewLoadBalancer(servers, "round-robin")
+
+	//should always return the healthy server
+	for i := 0; i < 5; i++ {
+		selectedServer := lb.GetNextServer()
+
+		if selectedServer == nil {
+			t.Fatal("Expected healthy server to be returned")
+		}
+
+		if !selectedServer.IsHealthy {
+			t.Errorf("Expected to get a healthy server")
+		}
+
+		if selectedServer.Address != servers[1].Address {
+			t.Errorf("Expected to get healthy server, got %s ", selectedServer.Address)
+		}
+	}
+}
+
+func TestNoHealthyServers(t *testing.T) {
+	servers, testServers := createTestServers(3, true)
+	defer cleanup(testServers)
+
+	lb := NewLoadBalancer(servers, "round-robin")
+
+	selectedServer := lb.GetNextServer()
+
+	if selectedServer != nil {
+		t.Error("Expected no server when all servers are unhealthy")
+	}
+}
+
+func TestLoadBalancerServerManagement(t *testing.T) {
+	servers, testServers := createTestServers(2, true)
+	defer cleanup(testServers)
+
+	lb := NewLoadBalancer(servers, "round-robin")
+
+	//test initial count
+	if lb.GetServerCount() != 2 {
+		t.Errorf("Expected 2 servers, got %d", lb.GetServerCount())
+	}
+
+	//test adding servers
+	newTestServer := createMockServer("new-server", http.StatusOK, 0)
+	defer newTestServer.Close()
+
+	newServerURL, _ := url.Parse(newTestServer.URL)
+	newServer := &Server{
+		Address:   newTestServer.URL,
+		IsHealthy: true,
+		URL:       newServerURL,
+	}
+
+	lb.AddServer(newServer)
+
+	if lb.GetServerCount() != 3 {
+		t.Errorf("Expected 3 servers after adding server, got %d", lb.GetServerCount())
+	}
+
+	//test removing server
+	lb.RemoveServer(newServer.Address)
+
+	if lb.GetServerCount() != 2 {
+		t.Errorf("Expected 2 servers after removing one, got %d", lb.GetServerCount())
+	}
+}
+
+func TestAlgorithmManagement(t *testing.T) {
+	servers, testServers := createTestServers(2, true)
+	defer cleanup(testServers)
+
+	lb := NewLoadBalancer(servers, "round-robin")
+
+	//test initial algorithm
+	if lb.GetAlgorithm() != "round-robin" {
+		t.Errorf("Expected round robin, got %s", lb.GetAlgorithm())
+	}
+
+	//test changing algorithm
+	lb.SetAlgorithm("least-connections")
+	if lb.GetAlgorithm() != "least-connections" {
+		t.Errorf("Expected to get least-connections, got %s", lb.GetAlgorithm())
+	}
+
+	//test invalid algorithm, should remain round-robin
+	lb.SetAlgorithm("super-fluous")
+	if lb.GetAlgorithm() != "least-connections" {
+		t.Errorf("Expected to remain least-connections,got %s", lb.GetAlgorithm())
+	}
+}
