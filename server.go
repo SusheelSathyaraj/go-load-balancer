@@ -103,7 +103,7 @@ func (s *Server) ActiveConnectionsHandler() http.HandlerFunc {
 		}`, s.Address, s.ConCount, healthStatus)
 
 		log.Printf("Status check for %s: %d connections, %s", s.Address, s.ConCount, healthStatus)
-		fmt.Fprintf(w, response)
+		fmt.Fprintln(w, response)
 	}
 }
 
