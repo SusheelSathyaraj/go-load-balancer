@@ -142,12 +142,14 @@ func TestServerHealthManagement(t *testing.T) {
 	}
 
 	//test setting healthy
-	if server.SetHealthy(true) {
+	server.SetHealthy(true)
+	if !server.IsHealthy {
 		t.Errorf("Expected server state to be set to true")
 	}
 
 	//test setting unhealthy
-	if server.SetHealthy(false) {
+	server.SetHealthy(false)
+	if server.IsHealthy {
 		t.Errorf("Expected server state to be set to false")
 	}
 }
