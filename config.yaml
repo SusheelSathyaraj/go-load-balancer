@@ -2,4 +2,4 @@ servers:
   - address: "http://localhost:8081"
   - address: "http://localhost:8082"
 health_check_interval: 10  # in seconds
-load_balancing_algorithm: "round-robin"  # or "least-connections"
+load_balancing_algorithm: "round-robin" #"round-robin" or "least-connections"
