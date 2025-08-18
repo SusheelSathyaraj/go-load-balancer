@@ -92,6 +92,47 @@ func TestNewServer(t *testing.T) {
 	})
 }
 
+func TestServerConnectionManagement(t *testing.T) {
+	server, _ := NewServer("http://localhost:8081")
+
+	//test initial state
+	if server.GetConnectionCount() != 0 {
+		t.Errorf("Expected the initial connection count to be 0, got %d", server.GetConnectionCount())
+	}
+
+	//test increment
+	server.IncrementConnectionCount()
+	if server.GetConnectionCount() != 1 {
+		t.Errorf("Expected connection count to be 1, got %d", server.GetConnectionCount())
+	}
+
+	//test multiple increments
+	server.IncrementConnectionCount()
+	server.IncrementConnectionCount()
+	if server.GetConnectionCount() != 3 {
+		t.Errorf("Expected connection count to be 3, got %d", server.GetConnectionCount())
+	}
+
+	//test decrement
+	server.DecrementConnectionCount()
+	if server.GetConnectionCount() != 2 {
+		t.Errorf("Expected connection count to be 2, got %d", server.GetConnectionCount())
+	}
+
+	//test multiple decrements
+	server.DecrementConnectionCount()
+	server.DecrementConnectionCount()
+	if server.GetConnectionCount() != 0 {
+		t.Errorf("Expected connection count to be 0, got %d", server.GetConnectionCount())
+	}
+
+	//test decrement below 0, should stay at 0
+	server.DecrementConnectionCount()
+	if server.GetConnectionCount() != 0 {
+		t.Errorf("Expected connection count to remain at 0, got %d", server.GetConnectionCount())
+	}
+}
+
 // Test for Load Balance
 func TestNewLoadBalancer(t *testing.T) {
 	servers, testServers := createTestServers(3, true)
