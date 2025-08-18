@@ -330,3 +330,32 @@ func TestAlgorithmManagement(t *testing.T) {
 		t.Errorf("Expected to remain least-connections,got %s", lb.GetAlgorithm())
 	}
 }
+
+//Test Health Checking
+
+func TestHealthCheck(t *testing.T) {
+	//Create servers, one healthy and one unhealthy
+	healthyServer := createMockServer("healthy", http.StatusOK, 0)
+	unhealthyServer := createMockServer("unhealthy", http.StatusServiceUnavailable, 0)
+	defer healthyServer.Close()
+	defer unhealthyServer.Close()
+
+	url1, _ := url.Parse(healthyServer.URL)
+	url2, _ := url.Parse(unhealthyServer.URL)
+
+	servers := []*Server{
+		{Address: healthyServer.URL, IsHealthy: false, URL: url1},  //initially set to false
+		{Address: unhealthyServer.URL, IsHealthy: true, URL: url2}, //initially set to true
+	}
+
+	//run single health check
+	checkAllServers(servers)
+
+	//check results
+	if !servers[0].IsHealthy {
+		t.Error("Expected first server to be healthy after health check")
+	}
+	if servers[1].IsHealthy {
+		t.Error("Expected second server to be unhealthy after the health check")
+	}
+}
