@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 )
@@ -435,6 +436,119 @@ func TestGetHealthyUnhealthyServers(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("Expected healthy server %s,not found", expected)
+		}
+	}
+}
+
+// test concurrent operations
+func TestConcurrentRequests(t *testing.T) {
+	servers, testServers := createTestServers(3, true)
+	defer cleanup(testServers)
+
+	lb := NewLoadBalancer(servers, "round-robin")
+
+	var wg sync.WaitGroup
+	numRequests := 300
+	results := make([]string, numRequests)
+
+	//Make concurrent Requests
+	for i := 0; i < numRequests; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			server := lb.GetNextServer()
+			if server != nil {
+				results[index] = server.Address
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	//count distributions
+	distribution := make(map[string]int)
+
+	for _, result := range results {
+		if result != "" {
+			distribution[result]++
+		}
+	}
+
+	if len(distribution) != 3 {
+		t.Errorf("Expected requests distributed amongst 3 servers, got %d", len(distribution))
+	}
+
+	//check roughly equal distribution, allow for 30% variance
+	expectedPerServer := numRequests / 3
+	for addr, count := range distribution {
+		if count < expectedPerServer*7/10 || count > expectedPerServer*13/10 {
+			t.Errorf("Server %s got %d requests, expected around %d", addr, count, expectedPerServer)
+		}
+	}
+}
+
+func TestConcurrentHealthChecks(t *testing.T) {
+	servers, testServers := createTestServers(10, true)
+	defer cleanup(testServers)
+
+	//run multiple concurrent health checks
+	var wg sync.WaitGroup
+	numChecks := 50
+
+	for i := 0; i < numChecks; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			checkAllServers(servers)
+		}()
+	}
+	wg.Wait()
+
+	//all servers should remain healthy
+	for i, server := range servers {
+		if !server.IsHealthy {
+			t.Errorf("Server %d should be healthy after concurrent checks", i)
+		}
+	}
+}
+
+func TestConcurrentConnectionCounting(t *testing.T) {
+	server, _ := NewServer("http://localhost:8081")
+
+	var wg sync.WaitGroup
+	numGoRoutines := 100
+	incrementsPerGoRoutine := 10
+
+	//concurrent increments
+	for i := 0; i < numGoRoutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < incrementsPerGoRoutine; j++ {
+				server.IncrementConnectionCount()
+			}
+		}()
+	}
+	wg.Wait()
+
+	expected := numGoRoutines * incrementsPerGoRoutine
+	if server.GetConnectionCount() != expected {
+		t.Errorf("Expected %d connections, got %d", expected, server.GetConnectionCount())
+	}
+
+	//concurrent decrements
+	for i := 0; i < numGoRoutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < incrementsPerGoRoutine; j++ {
+				server.DecrementConnectionCount()
+			}
+		}()
+
+		wg.Wait()
+
+		if server.GetConnectionCount() != 0 {
+			t.Errorf("Expected 0 connections after decrements, got %d", server.GetConnectionCount())
 		}
 	}
 }
