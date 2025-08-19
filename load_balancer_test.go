@@ -359,3 +359,82 @@ func TestHealthCheck(t *testing.T) {
 		t.Error("Expected second server to be unhealthy after the health check")
 	}
 }
+
+func TestHealthCheckWithTimeout(t *testing.T) {
+	//create slow server that takea longer than health check timeout
+	slowServer := createMockServer("slow", http.StatusOK, 10*time.Second)
+	defer slowServer.Close()
+
+	slowURL, _ := url.Parse(slowServer.URL)
+	servers := []*Server{
+		{Address: slowServer.URL, IsHealthy: true, URL: slowURL},
+	}
+
+	//run health check (should timeout and mark as unhealthy)
+	start := time.Now()
+	checkAllServers(servers)
+	duration := time.Since(start)
+
+	//Should complete quickly due to timeout
+	if duration > 7*time.Second {
+		t.Errorf("Health check took too long: %v", duration)
+	}
+
+	if servers[0].IsHealthy {
+		t.Errorf("Expected slow server to be marked unhealthy due timeout")
+	}
+}
+
+func TestGetServerCount(t *testing.T) {
+	servers, testServers := createTestServers(5, true)
+	defer cleanup(testServers)
+
+	//make some servers healthy
+	servers[1].IsHealthy = true
+	servers[3].IsHealthy = true
+
+	healthy, unhealthy := GetServerCount(servers)
+
+	if healthy != 2 {
+		t.Errorf("Expected 2 healthy servers, got %d", healthy)
+	}
+	if unhealthy != 3 {
+		t.Errorf("Expected 3 unhealthy servers, got %d", unhealthy)
+	}
+}
+
+func TestGetHealthyUnhealthyServers(t *testing.T) {
+	servers, testServers := createTestServers(4, false)
+	defer cleanup(testServers)
+
+	//make 2 servers healthy
+	servers[1].IsHealthy = true
+	servers[3].IsHealthy = true
+
+	healthyServers := GetHealthyServers(servers)
+	unhealthyServers := GetUnhealthyServers(servers)
+
+	if len(healthyServers) != 2 {
+		t.Errorf("Expected to get 2 healthy servers, got %d", len(healthyServers))
+	}
+	if len(unhealthyServers) != 2 {
+		t.Errorf("Expected to get 3 unhealthy servers, got %d", len(unhealthyServers))
+	}
+
+	//verify correct servers are returned
+	healthyAddresses := []string{healthyServers[1].Address, healthyServers[3].Address}
+	expectedhealthyAddresses := []string{servers[1].Address, servers[3].Address}
+
+	for _, expected := range expectedhealthyAddresses {
+		found := false
+		for _, actual := range healthyAddresses {
+			if actual == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected healthy server %s,not found", expected)
+		}
+	}
+}
