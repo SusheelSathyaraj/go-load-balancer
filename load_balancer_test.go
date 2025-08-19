@@ -195,7 +195,7 @@ func TestRoundRobinBalancing(t *testing.T) {
 	fourthServer := lb.GetNextServer()
 
 	if firstServer == nil || secondServer == nil || thirdServer == nil || fourthServer == nil {
-		t.Errorf("Expected servers to be returned")
+		t.Fatal("Expected servers to be returned")
 	}
 
 	//cycle through servers
