@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -651,5 +653,139 @@ func TestLoadConfigError(t *testing.T) {
 	_, err = loadConfig(tmpFile)
 	if err != nil {
 		t.Errorf("Expected error for invalid yaml")
+	}
+}
+
+// integration tests
+func TestFullIntegration(t *testing.T) {
+	//create backend servers
+	server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("healthy"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Response from Server1"))
+	}))
+	defer server1.Close()
+
+	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("healthy"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Response from Server2"))
+	}))
+	defer server2.Close()
+
+	//create config
+	configContent := fmt.Sprintf(`servers:
+	- address: "%s"
+	- address: "%s"
+	health_check_interval: 1
+	load_balancing_algorithm: "round-robin"`, server1.URL, server2.URL)
+
+	tmpFile := "/tmp/integration_config.yaml"
+	err := os.WriteFile(tmpFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write config, %v", err)
+	}
+	defer os.Remove(tmpFile)
+
+	//load config
+	config, err := loadConfig(tmpFile)
+	if err != nil {
+		t.Fatalf("Failed to load config file, %v", err)
+	}
+
+	//initialise servers
+	servers := make([]*Server, len(config.Servers))
+	for i, server := range config.Servers {
+		serverURL, _ := url.Parse(server.Address)
+		servers[i] = &Server{
+			Address:   server.Address,
+			IsHealthy: false,
+			URL:       serverURL,
+		}
+	}
+
+	//create load balancer
+	lb := NewLoadBalancer(servers, config.LoadBalancingAlgo)
+
+	//run initial health check
+	checkAllServers(servers)
+
+	//verify servers are healthy
+	if !servers[0].IsHealthy || !servers[1].IsHealthy {
+		t.Fatal("Expected both servers to be healthy after health check")
+	}
+
+	//create load balancer HTTP server
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", lb.handleRequest)
+	mux.HandleFunc("/status", lb.handleStatus)
+
+	lbServer := httptest.NewServer(mux)
+	defer lbServer.Close()
+
+	//test load balancing
+	responses := make([]string, 4)
+	for i := 0; i < 4; i++ {
+		resp, err := http.Get(lbServer.URL + "/")
+		if err != nil {
+			t.Fatalf("Request %d failed, %v", i, err)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Failed to read the response body, %v", err)
+		}
+		resp.Body.Close()
+
+		responses[i] = string(body)
+	}
+
+	//verify round robin distribution
+	server1Count := 0
+	server2Count := 0
+
+	for _, response := range responses {
+		if strings.Contains(response, "server 1") {
+			server1Count++
+		} else if strings.Contains(response, "server 2") {
+			server2Count++
+		}
+	}
+
+	if server1Count != 2 || server2Count != 2 {
+		t.Errorf("Expected 2 requests to each server, got server1: %d and server2: %d", server1Count, server2Count)
+	}
+
+	//test status endpoints
+	resp, err := http.Get(lbServer.URL + "/status")
+	if err != nil {
+		t.Fatalf("Status request failed, %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read the response body, %v", err)
+	}
+
+	statusResponse := string(body)
+	if !strings.Contains(statusResponse, "healthy") {
+		t.Errorf("Status response should contain 'healthy'")
+	}
+
+	if !strings.Contains(statusResponse, "round-robin") {
+		t.Errorf("Status response should contain algorithm name")
 	}
 }
