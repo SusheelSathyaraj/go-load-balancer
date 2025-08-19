@@ -789,3 +789,56 @@ func TestFullIntegration(t *testing.T) {
 		t.Errorf("Status response should contain algorithm name")
 	}
 }
+
+//Benchmark tests
+
+func BenchmarkRoundRobinSelection(b *testing.B) {
+	servers, testServers := createTestServers(10, true)
+	defer cleanup(testServers)
+
+	lb := NewLoadBalancer(servers, "round-robin")
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			lb.GetNextServer()
+		}
+	})
+}
+
+func BenchmarkLeastConnectionsSelection(b *testing.B) {
+	servers, testServers := createTestServers(10, true)
+	defer cleanup(testServers)
+
+	lb := NewLoadBalancer(servers, "least-connections")
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			lb.GetNextServer()
+		}
+	})
+}
+
+func BenchmarkConcurrentConnectionOperations(b *testing.B) {
+	server, _ := NewServer("http://localhost:8081")
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			server.IncrementConnectionCount()
+			server.GetConnectionCount()
+			server.DecrementConnectionCount()
+		}
+	})
+}
+
+func BenchmarkHealthCheck(b *testing.B) {
+	servers, testServers := createTestServers(20, true)
+	defer cleanup(testServers)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		checkAllServers(servers)
+	}
+}
