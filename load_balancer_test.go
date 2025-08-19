@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -550,5 +551,105 @@ func TestConcurrentConnectionCounting(t *testing.T) {
 		if server.GetConnectionCount() != 0 {
 			t.Errorf("Expected 0 connections after decrements, got %d", server.GetConnectionCount())
 		}
+	}
+}
+
+// test configuration loading
+func TestLoadConfig(t *testing.T) {
+	//create temporary config file details
+	configContent := `servers:
+	- address: "http://localhost:8081"
+	- address: "http://localhost:8082"
+	- address: "http://localhost:8083"
+	health_check_interval:15
+	load_balancing_algorithm: "least-connections"`
+
+	tmpFile := "/tmp/test_config.yaml"
+	err := os.WriteFile(tmpFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config, %v", err)
+	}
+	defer os.Remove(tmpFile)
+
+	config, err := loadConfig(tmpFile)
+	if err != nil {
+		t.Errorf("Failed to load the config file, %v", err)
+	}
+
+	if len(config.Servers) != 3 {
+		t.Errorf("Expected 3 servers, got %d", len(config.Servers))
+	}
+
+	if config.HealthCheckIntervals != 15 {
+		t.Errorf("Expected health check interval of 15, got %d", config.HealthCheckIntervals)
+	}
+
+	if config.LoadBalancingAlgo != "least-connections" {
+		t.Errorf("Expected least-connections as the algorithm, got %s", config.LoadBalancingAlgo)
+	}
+
+	//test expected server addresses
+	expectedAddresses := []string{
+		"http://localhost:8081",
+		"http://localhost:8082",
+		"http://localhost:8083",
+	}
+
+	for i, expected := range expectedAddresses {
+		if config.Servers[i].Address != expected {
+			t.Errorf("Expected server %d address %s, got %s", i, expected, config.Servers[i].Address)
+		}
+	}
+}
+
+func TestLoadConfigDefault(t *testing.T) {
+	//create config file with minimum details
+	configContent := `servers:
+	- address: "http://localhost:8081"`
+
+	tmpfile := "/tmp/test_config_defaults.yaml"
+	err := os.WriteFile(tmpfile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write test config, %v", err)
+	}
+	defer os.Remove(tmpfile)
+
+	config, err := loadConfig(tmpfile)
+	if err != nil {
+		t.Fatalf("Failed to load the config file, %v", err)
+	}
+
+	//check if defaults are applied
+	if config.HealthCheckIntervals != 10 {
+		t.Errorf("Expected health check interval of 10, got %d", config.HealthCheckIntervals)
+	}
+
+	if config.LoadBalancingAlgo != "round-robin" {
+		t.Errorf("Expected round-robin as the default algorithm, got %s", config.LoadBalancingAlgo)
+	}
+}
+
+func TestLoadConfigError(t *testing.T) {
+	//test non existent file
+	_, err := loadConfig("non-existent-file.yaml")
+	if err == nil {
+		t.Errorf("Expected error for non existent file")
+	}
+
+	//test invalid yaml
+	invalidContent := `servers:
+	- address: "http://localhost:8081"
+	invalid_yaml_content:[`
+
+	tmpFile := "/tmp/test_config_invalid.yaml"
+	err = os.WriteFile(tmpFile, []byte(invalidContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write invalid config, %v", err)
+	}
+	defer os.Remove(tmpFile)
+
+	_, err = loadConfig(tmpFile)
+	if err != nil {
+		t.Errorf("Expected error for invalid yaml")
 	}
 }
