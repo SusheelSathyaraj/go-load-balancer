@@ -97,6 +97,73 @@ servers:
 health_check_interval: 10  # Health check interval in seconds
 load_balancing_algorithm: "round-robin"  # or "least-connections"
 ```
+## Testing
+### Run all tests
+
+```bash
+# Basic test run
+go test -v
+
+# With race condition detection
+go test -v -race
+
+# With test coverage
+go test -v -cover
+
+# Generate detailed coverage report
+go test -coverprofile=coverage.out
+go tool cover -html=coverage.out
+```
+### Run Specific Test Categories
+
+```bash
+# Test server functionality
+go test -v -run TestServer
+
+# Test load balancing algorithms
+go test -v -run TestRoundRobin
+go test -v -run TestLeastConnections
+
+# Test health checking
+go test -v -run TestHealth
+
+# Test configuration loading
+go test -v -run TestLoadConfig
+
+# Test concurrent operations
+go test -v -run TestConcurrent
+
+# Integration tests
+go test -v -run TestFullIntegration
+```
+### Performance Benchmark
+
+```bash
+# Run all benchmarks
+go test -bench=. -v
+
+# Benchmark specific algorithms
+go test -bench=BenchmarkRoundRobin -v
+go test -bench=BenchmarkLeastConnections -v
+
+# Memory allocation benchmarks
+go test -bench=. -benchmem -v
+
+# CPU profiling
+go test -bench=. -cpuprofile=cpu.prof
+go tool pprof cpu.prof
+```
+
+## Test Coverage Goals
+Our Test Suite achieves
+  - **95% line coverage**
+  - **Concurrent safety validation**
+  - **Edge case handling**
+  - **Performance Benchmarking**
+
+## API Endpoints
+
+
 
 ## Load Balancing Algorithms
 
