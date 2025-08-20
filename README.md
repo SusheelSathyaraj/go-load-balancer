@@ -268,14 +268,14 @@ The load balancer automatically monitors the health of the servers:
 
 ## Performance Metrics
 Based on benchmark tests
-
+```
 | Operation             | Throughput      | Latency |                                   |
 |-----------------------|-----------------|---------|
 | Round Robin Selection | ~2M ops/sec     | ~500ns  |
 | Least Conenctions     | ~1.5M ops/sec   | ~650ns  |
 | Health Check          | ~10K checks/sec | ~100us  |
 | Concurrent Requests   | 10K+ req/sec    | <5ms    |
-
+```
 ## Monitoring and Observability
 
 ### Built-in Monitoring
