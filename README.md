@@ -163,7 +163,10 @@ Our Test Suite achieves
 
 ## API Endpoints
 
-
+| Endpoint | Method | Description                                   |
+|----------|--------|-----------------------------------------------|
+| /        | Any    | Load-balanced requests to backend servers     |
+| /status  | Get    | JSON status of all servers and health metrics |
 
 ## Load Balancing Algorithms
 
