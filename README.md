@@ -155,7 +155,7 @@ go tool pprof cpu.prof
 ```
 
 ## Test Coverage Goals
-Our Test Suite achieves
+The Test Suite achieves
   - **95% line coverage**
   - **Concurrent safety validation**
   - **Edge case handling**
@@ -168,19 +168,220 @@ Our Test Suite achieves
 | /        | Any    | Load-balanced requests to backend servers     |
 | /status  | Get    | JSON status of all servers and health metrics |
 
-## Load Balancing Algorithms
+### Status Endpoint Response
 
-- Round-robin: Distributes requests sequentially among servers.
-- Least Connections: Directs traffic to the server with the fewest active connections.
+```json
+{
+  "status": "healthy",
+  "algorithm": "round-robin",
+  "servers": [
+    {
+      "address": "http://localhost:8081",
+      "healthy": true,
+      "connections": 3
+    },
+    {
+      "address": "http://localhost:8082", 
+      "healthy": true,
+      "connections": 2
+    }
+  ]
+}
+```
+
+## Developement
+
+### Project Structure
+
+```
+go-load-balancer/
+├── main.go              # Main application entry point
+├── balancer.go          # Load balancing algorithms
+├── health.go            # Health checking logic
+├── server.go            # Server data structures
+├── config.yaml          # Configuration file
+├── load_balancer_test.go # Comprehensive test suite
+├── server1/
+│   └── server1.go       # Backend server 1
+├── server2/
+│   └── server2.go       # Backend server 2
+├── Makefile            # Build automation
+├── go.mod              # Go module definition
+└── README.md           # This file
+```
+
+## Available Make Commands
+
+```bash
+make build           # Build the load balancer binary
+make run             # Run the load balancer
+make test            # Run all tests
+make bench           # Run benchmark tests
+make clean           # Clean build artifacts
+make start-servers   # Start backend servers
+make stop-servers    # Stop backend servers
+make start-all       # Start everything
+```
+
+## Adding New Servers
+
+### 1. Add to Configuration
+
+```yaml
+servers:
+  - address: "http://localhost:8083"  # Add new server
+```
+
+### 2. Dynamic Addition (RunTime)
+
+```go
+newServer, _ := NewServer("http://localhost:8083")
+loadBalancer.AddServer(newServer)
+```
+
+## Load Balancing Algorithm
+
+**Round Robin**
+Distributes requests sequentially across all healthy servers
+
+Best for: Servers with similar capacity and uniform request processing time
+
+```yaml
+load_balancing_algorithm: "round-robin"
+```
+
+**Least Connections**
+Routes requests to the server with the fewest active connections
+
+Best for: Servers with varying processing times or when requests have different resource requirement
+
+```yaml
+load_balancing_algorithm: "least-connections"
+```
+
+## Health Monitoring
+The load balancer automatically monitors the health of the servers:
+- **Health Check Endpoint** `GET /health` on each backend server
+- **Configurable intervals** Set via `health-check-interval` in config
+- **Automatic Fallover** Unhealthy servers are automatically removed from the rotation
+- **Reocvery Detection** Servers are re-added automically when healthy
+
+## Performance Metrics
+Based on benchmark tests
+
+| Operation             | Throughput      | Latency |                                   |
+|-----------------------|-----------------|---------|
+| Round Robin Selection | ~2M ops/sec     | ~500ns  |
+| Least Conenctions     | ~1.5M ops/sec   | ~650ns  |
+| Health Check          | ~10K checks/sec | ~100us  |
+| Concurrent Requests   | 10K+ req/sec    | <5ms    |
+
+## Monitoring and Observability
+
+### Built-in Monitoring
+
+```bash
+# Check load balancer status
+curl http://localhost:8080/status
+
+# Monitor with watch
+watch -n 1 'curl -s http://localhost:8080/status | jq'
+```
+
+## Integration with Monitoring Tools
+- **Prometheus**: Exports metrics via `/metrics` endpoint
+- **Grafana**: Visualise server health and load distribution 
+
+## Testing Strategy
+The testing approach ensures reliability
+
+### Test categories
+
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: End to end functionality
+- **Concurrency Tests**: Race condition detection
+- **Performance Tests**: Benchmak validation
+- **Error Scenario Tests**: Failure handling
+
+### Test commands reference
+
+```bash
+# Quick test run
+go test
+
+# Verbose output with details
+go test -v
+
+# Race condition detection
+go test -race
+
+# Test coverage analysis
+go test -cover
+
+# Coverage report generation
+go test -coverprofile=coverage.out
+go tool cover -html=coverage.out -o coverage.html
+
+# Benchmark performance tests
+go test -bench=.
+
+# Memory allocation benchmarks
+go test -bench=. -benchmem
+
+# Run specific test patterns
+go test -run "TestRoundRobin|TestLeastConnections"
+
+# Stress testing with multiple runs
+go test -count=100 -race
+
+# Test timeout for long-running tests
+go test -timeout=30s
+
+# JSON output for CI/CD integration
+go test -json > test-results.json
+```
+
+## Troubleshooting
+Common Issues
+
+Port already in use:
+```bash
+# Find and kill process using port 8080
+lsof -ti:8080 | xargs kill -9
+```
+
+Server not responding:
+- Check if the backend servers are running
+- Verify server addresses in `config.yaml`
+- Check health check logs
+
+High Memory Usage:
+- Monitor with `go tool pprof`
+- Check for  connection leaks
+- Review healthcheck intervals
+
+Debug Mode:
+```bash
+# Run with verbose logging
+LOG_LEVEL=debug go run *.go
+
+# Enable request tracing
+TRACE_REQUESTS=true go run *.go
+```
 
 ## Contributing
+- 1. Fork the repository
+- 2. Create feature branch
+- 3. Make your changes
+- 4. Add comprehensive tests
+- 5. Ensure all tests pass (`go test -v -race -cover`)
+- 6. Commit your changes 
+- 7. Push to branch
+- 8. Open a Pull Request
 
-Contributions are welcome! Please fork this repository and submit a pull request for any changes you’d like to make.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-For any queries, please open an issue or reach out via email.
+## Developement Guidelines
+- Maintain test coverage above 90%
+- All code must pass race condition detection
+- Follow Go best practises and conventions
+- Add benchmarks for performance critical code
+- Update documentation for new feature
