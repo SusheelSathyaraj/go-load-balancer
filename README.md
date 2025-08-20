@@ -385,3 +385,16 @@ TRACE_REQUESTS=true go run *.go
 - Follow Go best practises and conventions
 - Add benchmarks for performance critical code
 - Update documentation for new feature
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Author
+
+**Susheel Sathyaraj**
+- Github: [@SusheelSathyaraj](https://github.com/SusheelSathyaraj)
+- LinkedIn: [Connect with me](https://linkedin.com/in/susheel-sathyaraj)
+
+**Star this repository** if you found it helpful
+**Found a bug?** Please open an issue
+**Have an idea?** Contributions are welcome
