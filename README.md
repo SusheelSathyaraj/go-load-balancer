@@ -30,6 +30,8 @@ A highly efficient, production-ready load balancer implemented in Go with suppor
 
 ## Architecture
 
+<img width="1764" height="1084" alt="image" src="https://github.com/user-attachments/assets/557594e2-c778-43d0-a94a-a537fdab3a76" />
+
 ## Requirements
 
 - Go 1.21 or higher
