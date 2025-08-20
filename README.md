@@ -29,20 +29,9 @@ A highly efficient, production-ready load balancer implemented in Go with suppor
   - Hot algorithm switching
 
 ## Architecture
-``
-┌─────────────┐    ┌──────────────────┐    ┌─────────────┐
-│   Client    │───▶│  Load Balancer   │───▶│   Server 1  │
-│             │    │    (Port 8080)   │    │ (Port 8081) │
-└─────────────┘    │                  │    └─────────────┘
-                   │  ┌─────────────┐ │    ┌─────────────┐
-                   │  │ Health      │ │───▶│   Server 2  │
-                   │  │ Checker     │ │    │ (Port 8082) │
-                   │  └─────────────┘ │    └─────────────┘
-                   └──────────────────┘    ┌─────────────┐
-                                           │   Server N  │
-                                           │ (Port 808N) │
-                                           └─────────────┘
-``
+
+<img width="1764" height="1084" alt="image" src="https://github.com/user-attachments/assets/90939fb1-4cd1-487c-8f47-4f7212189e8b" />
+
 ## Requirements
 
 - Go 1.16 or higher
