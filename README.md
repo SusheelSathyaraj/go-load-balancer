@@ -29,23 +29,11 @@ A highly efficient, production-ready load balancer implemented in Go with suppor
   - Hot algorithm switching
 
 ## Architecture
-``
-┌─────────────┐    ┌──────────────────┐    ┌─────────────┐
-│   Client    │───▶│  Load Balancer   │───▶│   Server 1  │
-│             │    │    (Port 8080)   │    │ (Port 8081) │
-└─────────────┘    │                  │    └─────────────┘
-                   │  ┌─────────────┐ │    ┌─────────────┐
-                   │  │ Health      │ │───▶│   Server 2  │
-                   │  │ Checker     │ │    │ (Port 8082) │
-                   │  └─────────────┘ │    └─────────────┘
-                   └──────────────────┘    ┌─────────────┐
-                                           │   Server N  │
-                                           │ (Port 808N) │
-                                           └─────────────┘
-``
+
 ## Requirements
 
-- Go 1.16 or higher
+- Go 1.21 or higher
+- Git
 - Compatible with any backend server pool
 
 ## Installation
@@ -58,27 +46,54 @@ cd go-load-balancer
 
 go mod tidy
 ```
-
-## Usage
-
-- Configure Backend Servers: Update config.yaml to specify the servers for load balancing.
-- Run the Load Balancer: Execute the following command to start the load balancer:
+## Running the Load Balancer
+### Method 1: Manual Setup
 
 ```bash
-  go run *.go -> to run all the .go extension files at once
-```
-- Access Logs and Monitoring: Check logs in the logs/ folder for detailed information on traffic distribution and health checks.
+# Terminal 1 - Start Backend Server 1
+cd server1
+go run server1.go
 
+# Terminal 2 - Start Backend Server 2  
+cd server2
+go run server2.go
+
+# Terminal 3 - Start Load Balancer
+go run *.go
+```
+### Method 2: Using Make
+
+```bash
+# Start all servers and load balancer
+make start-all
+
+# Or step by step:
+make start-servers    # Start backend servers
+make run             # Start load balancer
+```
+## Testing Load Balancer
+
+```bash
+# Test load balancing
+curl http://localhost:8080/
+
+# Check server status
+curl http://localhost:8080/status
+
+# Load test with multiple requests
+for i in {1..10}; do curl http://localhost:8080/; echo; done
+```
 ## Configuration
 
-Modify the config.yaml file to specify server details and health check intervals. Example:
+Edit `config.yaml` to customise the setup
 
 ```yaml
 servers:
-  - address: http://server1.com
-  - address: http://server2.com
-healthCheckInterval: 10s
-loadBalancingAlgorithm: round-robin and least connections
+  - address: "http://localhost:8081"
+  - address: "http://localhost:8082"
+  - address: "http://localhost:8083"  # Add more servers
+health_check_interval: 10  # Health check interval in seconds
+load_balancing_algorithm: "round-robin"  # or "least-connections"
 ```
 
 ## Load Balancing Algorithms
