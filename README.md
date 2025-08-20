@@ -1,14 +1,47 @@
 # Go Load Balancer
 
-A highly efficient, custom-built load balancer implemented in Go, designed to evenly distribute incoming network traffic across multiple servers. This load balancer helps ensure high availability and optimal resource utilization, making it ideal for scalable and fault-tolerant applications.
+A highly efficient, production-ready load balancer implemented in Go with support for multiple balancing algorithms and comprehensive health checking.
 
 ## Features
 
-- **Round-robin** and **Least Connections** balancing algorithms
-- **Health Checks** to ensure only available servers receive traffic
-- **Dynamic Server Pool** for easy addition and removal of servers
-- **Error Logging** and **Monitoring** capabilities
-- **High Performance** with minimal latency
+- **Multiple Load Balancing Algorithm**
+  - **Round-robin distibution** 
+  - **Least Connections routing**
+- **Health Monitoring** 
+  - Automatic Health Checks with configurable intervals
+  - Real-time server status tracking
+  - Graceful handling of Server failures
+- **High Performance**
+  - Thread-safe concurrent operations
+  - Minimal Latency overhead
+  - Efficient HTTP proxying
+- **Production Ready**
+  - Graceful shutdown handling
+  - Comprehensive error handling
+  - Resource leak prevention
+- **Monitoring and Observability**
+  - Real-time status endpoint
+  - Connection count tracking
+  - Health Status reporting
+- **Easy Configuration** 
+  - YAML based configuration
+  - Dynamic server pool management
+  - Hot algorithm switching
+
+## Architecture
+
+┌─────────────┐    ┌──────────────────┐    ┌─────────────┐
+│   Client    │───▶│  Load Balancer   │───▶│   Server 1  │
+│             │    │    (Port 8080)   │    │ (Port 8081) │
+└─────────────┘    │                  │    └─────────────┘
+                   │  ┌─────────────┐ │    ┌─────────────┐
+                   │  │ Health      │ │───▶│   Server 2  │
+                   │  │ Checker     │ │    │ (Port 8082) │
+                   │  └─────────────┘ │    └─────────────┘
+                   └──────────────────┘    ┌─────────────┐
+                                           │   Server N  │
+                                           │ (Port 808N) │
+                                           └─────────────┘
 
 ## Requirements
 
